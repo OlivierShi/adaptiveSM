@@ -4,7 +4,7 @@ import time
 
 import numpy as np
 import tensorflow as tf
-
+import adaptive_softmax
 from reader import *
 
 flags = tf.flags
@@ -65,15 +65,15 @@ class LSTMLM(object):
             cell = tf.nn.rnn_cell.MultiRNNCell([lstm_cell] * lstm_layers, state_is_tuple=False)
 
             inputs = tf.unstack(inputs, axis=1)
-            outputs, self.final_state = tf.nn.rnn(cell, inputs, initial_state=self.initial_state)
+            outputs, self.final_state = tf.nn.static_rnn(cell, inputs, initial_state=self.initial_state)
 
-            output = tf.reshape(tf.concat(1, outputs), [-1, lstm_size])
+            output = tf.reshape(tf.concat(outputs, axis=1), [-1, lstm_size])
 
             # Softmax & loss
             labels = tf.reshape(self.targets, [-1])
             if config.softmax_type == 'AdaptiveSoftmax':
                 cutoff = config.adaptive_softmax_cutoff
-                self.loss, training_losses = tf.contrib.layers.adaptive_softmax_loss(output, 
+                self.loss, training_losses = adaptive_softmax.adaptive_softmax_loss(output,
                     labels, cutoff)
             else:
                 stdv = np.sqrt(1. / vocab_size)

@@ -6,7 +6,7 @@ class LSTM:
     def __init__(self,rng,
                  n_input,n_hidden,n_batch,
                  x,E,mask,
-                 is_train=1,p=0.5):
+                 is_train=None,p=0.5):
         self.rng=rng
 
         self.n_input=n_input
@@ -95,8 +95,8 @@ class LSTM:
             # hidden state
             h_t= o_t * T.tanh(c_t)
 
-            c_t=c_t * m[:,None]
-            h_t=h_t * m[:,None]
+            c_t=c_t * m[:,None] + c_t * (1. - m)[:, None]
+            h_t=h_t * m[:,None] + h_t * (1. - m)[:, None]
 
             return [h_t,c_t]
 
@@ -105,16 +105,9 @@ class LSTM:
                             truncate_gradient=-1,
                             outputs_info=[dict(initial=T.zeros((self.n_batch,self.n_hidden))),
                                           dict(initial=T.zeros((self.n_batch,self.n_hidden)))])
-        self.activation=h
-        '''
-        # Dropout
-        if self.p>0:
-            drop_mask=self.rng.binomial(n=1,p=1-self.p,size=h.shape,dtype=theano.config.floatX)
-            self.activation=T.switch(T.eq(self.is_train,1),h*drop_mask,h*(1-self.p))
+        # Dropout layer
+        if self.p > 0:
+            drop_mask = self.rng.binomial(n=1, p=1.-self.p, size=h.shape, dtype=theano.config.floatX)
+            self.activation = T.switch(T.eq(self.is_train, 1), h*drop_mask, h*(1-self.p))
         else:
-            self.activation=T.switch(T.eq(self.is_train,1),h,h)
-        '''
-
-        
-            
-                    
+            self.activation = T.switch(T.eq(self.is_train, 1), h, h)

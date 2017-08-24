@@ -30,13 +30,14 @@ class softmax(object):
         
 class adaptive_softmax():
     
-    def __init__(self, inputs, labels,
+    def __init__(self, inputs, labels, y_mask,
                  n_dim,
                  cutoff, project_factor=4):
         '''
         Args:
             inputs: flattened logits with shape of [n_step*n_batch, n_dim]
             labels: flattened labels with shape of [n_step*n_batch]
+            y_mask: mask the null space of sentences with shape of [n_step*n_batch]
             cutoff: frequency binning, i.e. [2000, vocab_size]
             project_factor: project for low-frequency words
         '''
@@ -45,6 +46,7 @@ class adaptive_softmax():
         self.cluster_num = len(cutoff) - 1
         self.head_dim = cutoff[0] + self.cluster_num
         self.params = []
+        self.y_mask = y_mask
 
         init_head_w = np.asarray(np.random.uniform(low=-np.sqrt(1./self.input_dim),
                                               high=np.sqrt(1./self.input_dim),
@@ -78,7 +80,7 @@ class adaptive_softmax():
         loss = 0.
         head_labels = labels
         for i in range(self.cluster_num):
-            mask = T.bitwise_and(T.ge(labels, cutoff[i]), T.lt(labels, cutoff[i + 1]))
+            mask = T.bitwise_and(T.ge(labels, cutoff[i]), T.lt(labels, cutoff[i + 1]))  # mask that delete words not in cluster
             # update head labels
             head_labels = T.switch(mask, T.constant([cutoff[0] + i]).repeat(self.sample_num), head_labels)
 
@@ -86,15 +88,22 @@ class adaptive_softmax():
             tail_inputs = inputs[mask.nonzero()]
             tail_logits = T.dot(T.dot(tail_inputs, tail_w_list[i][0]), tail_w_list[i][1])
             tail_labels = (labels - cutoff[i])[mask.nonzero()]
-            tail_loss = T.sum(T.nnet.categorical_crossentropy(tail_logits, tail_labels))
+            tail_y_mask = self.y_mask[mask.nonzero()]  # mask that eases the effect of null space
+            tail_logits = tail_logits[T.eq(tail_y_mask, 1).nonzero()]
+            tail_labels = tail_labels[T.eq(tail_y_mask, 1).nonzero()]
+            tail_loss = T.mean(T.nnet.categorical_crossentropy(tail_logits, tail_labels))
             training_losses.append(tail_loss)
             loss += tail_loss
 
         # compute head loss
         head_logits = T.dot(inputs, self.head_w)
-        head_loss = T.sum(T.nnet.categorical_crossentropy(head_logits, head_labels))
+        head_logits = head_logits[T.eq(self.y_mask, 1).nonzero()]
+        head_labels = head_labels[T.eq(self.y_mask, 1).nonzero()]
+        head_loss = T.mean(T.nnet.categorical_crossentropy(head_logits, head_labels))
         loss += head_loss
         training_losses.append(head_loss)
 
         self.loss = loss
         self.training_losses = training_losses
+        self.head_logits = head_logits
+        self.head_labels = head_labels

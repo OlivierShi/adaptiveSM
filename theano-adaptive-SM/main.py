@@ -7,7 +7,7 @@ import logging
 from argparse import ArgumentParser 
 import sys
 
-lr=0.05
+lr=0.01
 p=0.5
 NEPOCH=200
 
@@ -41,10 +41,10 @@ pred_freq=20000
 
 def evaluate(test_data,model):
     cost=0.
-    index=0
+    index=0.
     for x,x_mask,y,y_mask in test_data:
-        index+=np.sum(y_mask)
-        cost+=model.test(x,x_mask,y)
+        index+=1.
+        cost+=model.test(x,x_mask,y,y_mask)
     return cost/index
 
 def train(lr):
@@ -64,21 +64,25 @@ def train(lr):
     idx=0
     for epoch in xrange(NEPOCH):
         error=0.
-        err_norm = 0.
         in_start=time.time()
         for x,x_mask,y,y_mask in train_data:
             idx+=1
-            err_norm += np.sum(y_mask)
             beg_time=time.time()
-            cost=model.train(x,x_mask,y,lr)[0]
+            train_out=model.train(x,x_mask,y,y_mask,lr)
+            cost = train_out[0]
+            hidden_layer_act = train_out[1]
+            output_layer_act = train_out[2]
+            output_layer_lab = train_out[3]
+            print output_layer_act.shape
+            print output_layer_lab.shape
+            print hidden_layer_act,output_layer_act,output_layer_lab
             error+=np.sum(cost)
             if np.isnan(cost) or np.isinf(cost):
                 print 'NaN Or Inf detected!'
                 return -1
             if idx % disp_freq==0:
-                print 'time: ',time.time()-beg_time,'epoch:',epoch,'idx:',idx,'cost:',error/err_norm,'ppl:',np.exp(error/err_norm),'lr:',lr
+                print 'time: ',time.time()-beg_time,'epoch:',epoch,'idx:',idx,'cost:',error/disp_freq,'ppl:',np.exp(error/disp_freq),'lr:',lr
                 error=0
-                err_norm = 0.
             if idx%save_freq==0:
                 print 'dumping...'
                 save_model('./model/parameters_%.2f.pkl'%(time.time()-start),model)

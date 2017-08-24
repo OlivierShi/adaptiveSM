@@ -46,12 +46,13 @@ class RNNLM(object):
             logit_shape = softmax_inputs.shape
             softmax_inputs = softmax_inputs.reshape([logit_shape[0]*logit_shape[1], logit_shape[2]])
             labels = self.y.flatten()
-            output_layer = adaptive_softmax(softmax_inputs, labels,
+            y_mask = self.y_mask.flatten()
+            output_layer = adaptive_softmax(softmax_inputs, labels, y_mask,
                                             self.n_hidden,
                                             cutoff)
             #cost = T.sum(output_layer.loss)
             training_loss = output_layer.training_losses
-            cost = T.sum([loss.sum() for loss in training_loss])
+            cost = output_layer.loss
         else:
             output_layer = softmax(self.n_hidden, self.n_output, hidden_layer.activation)
             cost = self.categorical_crossentropy(output_layer.activation, self.y)
@@ -60,15 +61,15 @@ class RNNLM(object):
         self.params += output_layer.params
 
         lr = T.scalar("lr")
-        gparams = [T.clip(T.grad(cost, p), -5, 5) for p in self.params]
+        gparams = [T.clip(T.grad(cost, p), -1, 1) for p in self.params]
         updates = self.optimizer(self.params, gparams, lr)
 
-        self.train = theano.function(inputs=[self.x, self.x_mask, self.y, lr],
-                                     outputs=[cost,hidden_layer.activation],
+        self.train = theano.function(inputs=[self.x, self.x_mask, self.y, self.y_mask, lr],
+                                     outputs=[cost,hidden_layer.activation, output_layer.head_logits, output_layer.head_labels],
                                      updates=updates,
                                      givens={self.is_train: np.cast['int32'](1)})
 
-        self.test = theano.function(inputs=[self.x, self.x_mask,self.y],
+        self.test = theano.function(inputs=[self.x, self.x_mask,self.y, self.y_mask],
                                     outputs=cost,
                                     givens={self.is_train: np.cast['int32'](0)})
 

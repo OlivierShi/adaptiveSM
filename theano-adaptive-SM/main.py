@@ -70,18 +70,29 @@ def train(lr):
             beg_time=time.time()
             train_out=model.train(x,x_mask,y,y_mask,lr)
             cost = train_out[0]
-            hidden_layer_act = train_out[1]
-            output_layer_act = train_out[2]
-            output_layer_lab = train_out[3]
-            print output_layer_act.shape
-            print output_layer_lab.shape
-            print hidden_layer_act,output_layer_act,output_layer_lab
+            hidden_act = train_out[1]
+            tail_logits = train_out[2]
+            tail_labels = train_out[3]
+            tail_loss = train_out[4]
+            head_loss =train_out[5]
+            # print tail_logits
+            # print tail_logits.shape
+            # print '==============='
+            # print tail_labels
+            # print tail_labels.shape
+            # print '==============='
+            # print tail_loss
+            # print '==============='
+            # print head_loss
+
             error+=np.sum(cost)
             if np.isnan(cost) or np.isinf(cost):
                 print 'NaN Or Inf detected!'
                 return -1
             if idx % disp_freq==0:
                 print 'time: ',time.time()-beg_time,'epoch:',epoch,'idx:',idx,'cost:',error/disp_freq,'ppl:',np.exp(error/disp_freq),'lr:',lr
+                print "Head loss: ", head_loss
+                print "Tail loss: ", tail_loss
                 error=0
             if idx%save_freq==0:
                 print 'dumping...'

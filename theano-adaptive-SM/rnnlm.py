@@ -50,7 +50,7 @@ class RNNLM(object):
             output_layer = adaptive_softmax(softmax_inputs, labels, y_mask,
                                             self.n_hidden,
                                             cutoff)
-            #cost = T.sum(output_layer.loss)
+            #cost = T.sum
             training_loss = output_layer.training_losses
             cost = output_layer.loss
         else:
@@ -65,7 +65,7 @@ class RNNLM(object):
         updates = self.optimizer(self.params, gparams, lr)
 
         self.train = theano.function(inputs=[self.x, self.x_mask, self.y, self.y_mask, lr],
-                                     outputs=[cost,hidden_layer.activation, output_layer.head_logits, output_layer.head_labels],
+                                     outputs=[cost,hidden_layer.activation, output_layer.tail_logits, output_layer.tail_labels, output_layer.tail_loss, output_layer.head_loss],
                                      updates=updates,
                                      givens={self.is_train: np.cast['int32'](1)})
 

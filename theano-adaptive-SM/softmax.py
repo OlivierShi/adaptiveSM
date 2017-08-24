@@ -91,13 +91,18 @@ class adaptive_softmax():
             tail_y_mask = self.y_mask[mask.nonzero()]  # mask that eases the effect of null space
             tail_logits = tail_logits[T.eq(tail_y_mask, 1).nonzero()]
             tail_labels = tail_labels[T.eq(tail_y_mask, 1).nonzero()]
+            tail_logits = T.clip(tail_logits, 1.0e-8, 1.0 - 1.0e-8)
             tail_loss = T.mean(T.nnet.categorical_crossentropy(tail_logits, tail_labels))
             training_losses.append(tail_loss)
             loss += tail_loss
+            self.tail_logits = tail_logits
+            self.tail_labels = tail_labels
+            self.tail_loss = tail_loss
 
         # compute head loss
         head_logits = T.dot(inputs, self.head_w)
         head_logits = head_logits[T.eq(self.y_mask, 1).nonzero()]
+        head_logits = T.clip(head_logits, 1.0e-8, 1.0 - 1.0e-8)
         head_labels = head_labels[T.eq(self.y_mask, 1).nonzero()]
         head_loss = T.mean(T.nnet.categorical_crossentropy(head_logits, head_labels))
         loss += head_loss
@@ -105,5 +110,5 @@ class adaptive_softmax():
 
         self.loss = loss
         self.training_losses = training_losses
-        self.head_logits = head_logits
-        self.head_labels = head_labels
+        self.head_loss = head_loss
+

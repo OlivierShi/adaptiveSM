@@ -63,7 +63,7 @@ class LSTM:
 
         # Params
         self.params=[self.Wi,self.Wf,self.Wc,self.Wo,
-                     self.bi,self.bf,self.bc,self.bo];
+                     self.bi,self.bf,self.bc,self.bo]
 
         self.build()
 
@@ -95,8 +95,8 @@ class LSTM:
             # hidden state
             h_t= o_t * T.tanh(c_t)
 
-            c_t=c_t * m[:,None] + c_t * (1. - m)[:, None]
-            h_t=h_t * m[:,None] + h_t * (1. - m)[:, None]
+            c_t=c_t * m[:,None]
+            h_t=h_t * m[:,None]
 
             return [h_t,c_t]
 

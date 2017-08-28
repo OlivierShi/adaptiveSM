@@ -65,7 +65,7 @@ class RNNLM(object):
         updates = self.optimizer(self.params, gparams, lr)
 
         self.train = theano.function(inputs=[self.x, self.x_mask, self.y, self.y_mask, lr],
-                                     outputs=[cost,hidden_layer.activation, output_layer.tail_logits, output_layer.tail_labels, output_layer.tail_loss, output_layer.head_loss],
+                                     outputs=[cost,hidden_layer.activation, output_layer.head_loss, output_layer.tail_loss],
                                      updates=updates,
                                      givens={self.is_train: np.cast['int32'](1)})
 
@@ -77,4 +77,4 @@ class RNNLM(object):
         y_pred = T.clip(y_pred, self.epsilon, 1.0 - self.epsilon)
         y_true = y_true.flatten()
         nll = T.nnet.categorical_crossentropy(y_pred, y_true)
-        return T.sum(nll * self.y_mask.flatten())
+        return T.sum(nll * self.y_mask.flatten())/self.y_mask.sum()

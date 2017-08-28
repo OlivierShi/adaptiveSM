@@ -71,27 +71,33 @@ class adaptive_softmax():
             tail_project_factor *= project_factor
             self.params.append(tail_proj_w)
             self.params.append(tail_w)
-        # delete null indexes by y_mask
-        # y_mask = y_mask.flatten()
-        # inputs = inputs[y_mask.nonzero()]
-        # labels = labels[y_mask.nonzero()]
-        # Get tail masks and update head labels
+
         training_losses = []
         loss = 0.
         head_labels = labels
         for i in range(self.cluster_num):
-            mask = T.bitwise_and(T.ge(labels, cutoff[i]), T.lt(labels, cutoff[i + 1]))  # mask that delete words not in cluster
-            # update head labels
+            mask = T.bitwise_and(T.ge(labels, cutoff[i]), T.lt(labels, cutoff[i + 1]))  # mask words not in this cluster
+
+            # update head labels with mask (we take words with high frequency as head part)
             head_labels = T.switch(mask, T.constant([cutoff[0] + i]).repeat(self.sample_num), head_labels)
+            # we take words with low frequency as a unified label, and append to tail of head labels
+            # i.g. 3000 -> 2000, 2001 -> 2000
+            # head labels: [0,1,2...,1999] + [2000]
 
             # compute tail loss
+            # first remove the words not in this cluster (this range of frequency) with mask
             tail_inputs = inputs[mask.nonzero()]
+            # encode on tail inputs and get logits
             tail_logits = T.dot(T.dot(tail_inputs, tail_w_list[i][0]), tail_w_list[i][1])
+            # update tail labels, relabel by (- 2000)
             tail_labels = (labels - cutoff[i])[mask.nonzero()]
-            tail_y_mask = self.y_mask[mask.nonzero()]  # mask that eases the effect of null space
+            # y_mask that eases the effect of null space in the tail of sentences
+            tail_y_mask = self.y_mask[mask.nonzero()]
             tail_logits = tail_logits[T.eq(tail_y_mask, 1).nonzero()]
             tail_labels = tail_labels[T.eq(tail_y_mask, 1).nonzero()]
+            # to solve NaN problem
             tail_logits = T.clip(tail_logits, 1.0e-8, 1.0 - 1.0e-8)
+            # tail_loss for words with low frequency
             tail_loss = T.mean(T.nnet.categorical_crossentropy(tail_logits, tail_labels))
             training_losses.append(tail_loss)
             loss += tail_loss
@@ -100,10 +106,13 @@ class adaptive_softmax():
             self.tail_loss = tail_loss
 
         # compute head loss
+        # encode head_inputs
         head_logits = T.dot(inputs, self.head_w)
+        # y_mask that eases the effect of null space in the tail of sentences
         head_logits = head_logits[T.eq(self.y_mask, 1).nonzero()]
-        head_logits = T.clip(head_logits, 1.0e-8, 1.0 - 1.0e-8)
         head_labels = head_labels[T.eq(self.y_mask, 1).nonzero()]
+        # to solve NaN problem
+        head_logits = T.clip(head_logits, 1.0e-8, 1.0 - 1.0e-8)
         head_loss = T.mean(T.nnet.categorical_crossentropy(head_logits, head_labels))
         loss += head_loss
         training_losses.append(head_loss)
